@@ -27,10 +27,6 @@
   > - Created DbContext with all entity configurations
   > - Configured Aspire AppHost to use SQL Server
 
----
-
-## API Endpoints
-
 - [x] **Create table management API endpoints**
   Task ID: `table-mgmt-01`
   > **Implementation**: Created `src/LowRollers.Api/Features/TableManagement/`
@@ -44,63 +40,14 @@
   > - Added `TableStatus` enum for compile-time safety (Lobby, Active, Paused, Closed)
   > - TableConfig includes validation rules per HOST-TABLE-002 through HOST-TABLE-005
 
-- [ ] **Implement join table flow**
-  Task ID: `table-mgmt-02`
-  > **Implementation**: Extend `src/LowRollers.Api/Features/TableManagement/`
-  > **Details**:
-  > - `ValidateInviteQuery.cs` - Check invite code hash exists, session active
-  > - `JoinTableCommand.cs` + `JoinTableHandler.cs`
-  >   - Validate display name (2-20 chars, unique at session, not banned)
-  >   - Create/find player in global `Players` registry
-  >   - Create `GameSessionPlayers` record linking player to session
-  >   - Create guest session in Redis
-  >   - Generate JWT token (SessionId, PlayerId, DisplayName)
-  >   - Broadcast player joined via SignalR
-  > - Return session token
-
-- [ ] **Implement leave table flow**
-  Task ID: `table-mgmt-03`
-  > **Implementation**: Extend `src/LowRollers.Api/Features/TableManagement/`
-  > **Details**:
-  > - `LeaveTableCommand.cs`
-  >   - Remove player from table
-  >   - If host leaving, transfer to longest-seated
-  >   - If last player, close table
-  >   - Clean up Redis session
-
-- [ ] **Implement seat management**
-  Task ID: `table-mgmt-04`
-  > **Implementation**: Create `src/LowRollers.Api/Features/TableManagement/Seating/`
-  > **Details**:
-  > - `TakeSeatCommand.cs` - Assign seat position (1-10)
-  > - `StandUpCommand.cs` - Release seat, keep in lobby
-  > - Validate seat not already taken
-  > - Broadcast seat changes via SignalR
-
----
-
-## Invite System
-
-- [ ] **Implement invite link system**
-  Task ID: `table-mgmt-05`
-  > **Implementation**: Create `src/LowRollers.Api/Features/TableManagement/Invites/`
-  > **Details**:
-  > - `InviteCodeGenerator.cs`
-  >   - Use `RandomNumberGenerator` for crypto-secure codes
-  >   - 8-12 alphanumeric characters
-  >   - Store hash, not plain text
-  > - `RegenerateInviteCommand.cs`
-  >   - Generate new code
-  >   - Invalidate old code immediately
-  >   - Broadcast to connected players
-
 ---
 
 ## Authentication
 
 - [ ] **Implement Firebase Anonymous Authentication**
-  Task ID: `table-mgmt-05a`
+  Task ID: `table-mgmt-02`
   > **Implementation**: Integrate Firebase Auth for anonymous user identity
+  > **Why First**: Provides unique `FirebaseUid` per browser for proper player identity. Must be implemented before join flow to avoid player identity collisions.
   > **Details**:
   > - **Firebase Setup**:
   >   - Create Firebase project (or use existing)
@@ -127,12 +74,66 @@
 
 ---
 
+## API Endpoints
+
+- [ ] **Implement join table flow**
+  Task ID: `table-mgmt-03`
+  > **Depends on**: `table-mgmt-02` (Firebase Auth)
+  > **Implementation**: Extend `src/LowRollers.Api/Features/TableManagement/`
+  > **Details**:
+  > - `ValidateInviteQuery.cs` - Check invite code hash exists, session active
+  > - `JoinTableCommand.cs` + `JoinTableHandler.cs`
+  >   - Validate display name (2-20 chars, unique at session, not banned)
+  >   - Create/find player by `FirebaseUid` in global `Players` registry
+  >   - Create `GameSessionPlayers` record linking player to session
+  >   - Create guest session in Redis
+  >   - Use Firebase ID token for authentication
+  >   - Broadcast player joined via SignalR
+
+- [ ] **Implement leave table flow**
+  Task ID: `table-mgmt-04`
+  > **Implementation**: Extend `src/LowRollers.Api/Features/TableManagement/`
+  > **Details**:
+  > - `LeaveTableCommand.cs`
+  >   - Remove player from table
+  >   - If host leaving, transfer to longest-seated
+  >   - If last player, close table
+  >   - Clean up Redis session
+
+- [ ] **Implement seat management**
+  Task ID: `table-mgmt-05`
+  > **Implementation**: Create `src/LowRollers.Api/Features/TableManagement/Seating/`
+  > **Details**:
+  > - `TakeSeatCommand.cs` - Assign seat position (1-10)
+  > - `StandUpCommand.cs` - Release seat, keep in lobby
+  > - Validate seat not already taken
+  > - Broadcast seat changes via SignalR
+
+---
+
+## Invite System
+
+- [ ] **Implement invite link system**
+  Task ID: `table-mgmt-06`
+  > **Implementation**: Create `src/LowRollers.Api/Features/TableManagement/Invites/`
+  > **Details**:
+  > - `InviteCodeGenerator.cs`
+  >   - Use `RandomNumberGenerator` for crypto-secure codes
+  >   - 8-12 alphanumeric characters
+  >   - Store hash, not plain text
+  > - `RegenerateInviteCommand.cs`
+  >   - Generate new code
+  >   - Invalidate old code immediately
+  >   - Broadcast to connected players
+
+---
+
 ## Guest Session Management
 
 - [ ] **Implement guest session service**
-  Task ID: `table-mgmt-06`
+  Task ID: `table-mgmt-07`
+  > **Depends on**: `table-mgmt-02` (Firebase Auth)
   > **Implementation**: Create `src/LowRollers.Api/Features/Sessions/`
-  > **Depends on**: `table-mgmt-05a` (Firebase Auth)
   > **Details**:
   > - `GuestSession.cs` - Redis model (references PlayerId from global Players)
   > - `GuestSessionService.cs`
@@ -142,7 +143,7 @@
   > - `PlayerService.cs` - Create/find players by FirebaseUid
 
 - [ ] **Implement reconnection logic**
-  Task ID: `table-mgmt-07`
+  Task ID: `table-mgmt-08`
   > **Implementation**: Extend `src/LowRollers.Api/Features/Sessions/`
   > **Details**:
   > - `ReconnectCommand.cs`
@@ -157,7 +158,7 @@
 ## Host Controls
 
 - [ ] **Implement host privileges**
-  Task ID: `table-mgmt-08`
+  Task ID: `table-mgmt-09`
   > **Implementation**: Create `src/LowRollers.Api/Features/TableManagement/HostControls/`
   > **Details**:
   > - `KickPlayerCommand.cs` - Remove player immediately
@@ -168,7 +169,7 @@
   > - `StopGameCommand.cs` - End game session
 
 - [ ] **Implement auto host transfer**
-  Task ID: `table-mgmt-09`
+  Task ID: `table-mgmt-10`
   > **Implementation**: Extend `src/LowRollers.Api/Features/TableManagement/`
   > **Details**:
   > - On host disconnect (5-min timeout), auto-transfer
@@ -181,7 +182,7 @@
 ## Chip Management
 
 - [ ] **Implement buy-in system**
-  Task ID: `table-mgmt-10`
+  Task ID: `table-mgmt-11`
   > **Implementation**: Create `src/LowRollers.Api/Features/ChipManagement/`
   > **Details**:
   > - `BuyInCommand.cs`
@@ -202,7 +203,7 @@
 ## SignalR Integration
 
 - [ ] **Create table SignalR hub methods**
-  Task ID: `table-mgmt-11`
+  Task ID: `table-mgmt-12`
   > **Implementation**: Extend `src/LowRollers.Api/Hubs/GameHub.cs`
   > **Details**:
   > - `JoinTableGroup(tableId)` - Add connection to SignalR group
@@ -225,7 +226,7 @@
 > Approved designs are stored in `docs/designs/` for implementation reference.
 
 - [ ] **Create table creation page**
-  Task ID: `table-mgmt-12`
+  Task ID: `table-mgmt-13`
   > **Implementation**: Create `src/LowRollers.Web/src/app/features/table/create-table/`
   > **Details**:
   > - `create-table.component.ts`
@@ -238,7 +239,7 @@
   > - Use PrimeNG InputText, Button, Card
 
 - [ ] **Create join table page**
-  Task ID: `table-mgmt-13`
+  Task ID: `table-mgmt-14`
   > **Implementation**: Create `src/LowRollers.Web/src/app/features/table/join-table/`
   > **Details**:
   > - `join-table.component.ts`
@@ -249,7 +250,7 @@
   > - Use PrimeNG InputText, Button, Message
 
 - [ ] **Create table lobby component**
-  Task ID: `table-mgmt-14`
+  Task ID: `table-mgmt-15`
   > **Implementation**: Create `src/LowRollers.Web/src/app/features/table/table-lobby/`
   > **Details**:
   > - `table-lobby.component.ts`
@@ -261,7 +262,7 @@
   > - Use PrimeNG DataView, Button, Dialog
 
 - [ ] **Create buy-in dialog**
-  Task ID: `table-mgmt-15`
+  Task ID: `table-mgmt-16`
   > **Implementation**: Create `src/LowRollers.Web/src/app/features/table/buy-in-dialog/`
   > **Details**:
   > - `buy-in-dialog.component.ts`
@@ -271,7 +272,7 @@
   > - Use PrimeNG Dialog, Slider, InputNumber
 
 - [ ] **Create host controls panel**
-  Task ID: `table-mgmt-16`
+  Task ID: `table-mgmt-17`
   > **Implementation**: Create `src/LowRollers.Web/src/app/features/table/host-controls/`
   > **Details**:
   > - `host-controls.component.ts`
@@ -286,7 +287,7 @@
 ## Testing
 
 - [ ] **Create table management tests**
-  Task ID: `table-mgmt-17`
+  Task ID: `table-mgmt-18`
   > **Implementation**: Create `tests/LowRollers.Api.Tests/Features/TableManagement/`
   > **Details**:
   > - Create table generates valid invite code
@@ -297,14 +298,14 @@
   > - Host transfer logic
 
 - [ ] **Create session management tests**
-  Task ID: `table-mgmt-18`
+  Task ID: `table-mgmt-19`
   > **Implementation**: Create `tests/LowRollers.Api.Tests/Features/Sessions/`
   > **Details**:
   > - Session creation stores in Redis
   > - Session expiry after timeout
   > - Reconnection within window succeeds
   > - Reconnection after window fails
-  > - JWT validation
+  > - Firebase token validation
 
 ---
 
@@ -318,7 +319,7 @@
 - [ ] Host can kick/ban players
 - [ ] Host transfer on disconnect works
 - [ ] Buy-in within limits enforced
-- [ ] All API endpoints secured with session auth
+- [ ] All API endpoints secured with Firebase Auth
 
 ---
 
