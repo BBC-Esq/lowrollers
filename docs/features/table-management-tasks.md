@@ -6,6 +6,29 @@
 
 ---
 
+## Database Setup
+
+- [x] **Set up SQL Server Database Project**
+  Task ID: `table-mgmt-00`
+  > **Implementation**: Created `src/LowRollers.Database` project
+  > **Details**:
+  > - Added SQL Server Database Project to solution
+  > - Created all tables matching spec:
+  >   - `Games` - Lookup table (Texas Holdem)
+  >   - `Players` - Global player registry
+  >   - `GameTables` - Reusable table templates
+  >   - `GameSessions` - Active game instances (with InviteCodeHash, PasswordHash)
+  >   - `GameSessionPlayers` - Player-session junction (with TimeBankSeconds, ChipStack, IsHost)
+  >   - `SessionTransactions` - Buy-in/cash-out tracking (with SessionId FK)
+  >   - `SessionHands` - Hand containers
+  >   - `SessionHandEvents` - Event sourcing (NULL PlayerId for system events)
+  >   - `TableTemplates` - Saved configurations
+  > - Added Entity Framework Core with SQL Server provider (Aspire integration)
+  > - Created DbContext with all entity configurations
+  > - Configured Aspire AppHost to use SQL Server
+
+---
+
 ## API Endpoints
 
 - [ ] **Create table management API endpoints**
@@ -14,8 +37,11 @@
   > **Details**:
   > - `CreateTableCommand.cs` + `CreateTableHandler.cs`
   >   - Validate host display name
-  >   - Generate cryptographic invite code
-  >   - Create table in PostgreSQL
+  >   - Create/find player in global `Players` registry
+  >   - Create `GameTables` record with TableConfig JSON
+  >   - Create `GameSessions` record linked to table
+  >   - Generate cryptographic invite code (store hash in GameSessions)
+  >   - Create `GameSessionPlayers` record for host
   >   - Create host session in Redis
   >   - Return invite code and host session token
   > - `GetTableQuery.cs` - Return table state for authorized players
@@ -24,12 +50,14 @@
   Task ID: `table-mgmt-02`
   > **Implementation**: Extend `src/LowRollers.Api/Features/TableManagement/`
   > **Details**:
-  > - `ValidateInviteQuery.cs` - Check invite code exists, table active
+  > - `ValidateInviteQuery.cs` - Check invite code hash exists, session active
   > - `JoinTableCommand.cs` + `JoinTableHandler.cs`
-  >   - Validate display name (2-20 chars, unique, not banned)
+  >   - Validate display name (2-20 chars, unique at session, not banned)
+  >   - Create/find player in global `Players` registry
+  >   - Create `GameSessionPlayers` record linking player to session
   >   - Create guest session in Redis
-  >   - Generate JWT token
-  >   - Add player to table
+  >   - Generate JWT token (SessionId, PlayerId, DisplayName)
+  >   - Broadcast player joined via SignalR
   > - Return session token
 
 - [ ] **Implement leave table flow**
@@ -76,12 +104,13 @@
   Task ID: `table-mgmt-06`
   > **Implementation**: Create `src/LowRollers.Api/Features/Sessions/`
   > **Details**:
-  > - `GuestSession.cs` - Model
+  > - `GuestSession.cs` - Redis model (references PlayerId from global Players)
   > - `GuestSessionService.cs`
-  >   - Create session in Redis
+  >   - Create session in Redis with PlayerId reference
   >   - 5-minute reconnection window
-  >   - JWT token generation (SessionId, DisplayName, TableId)
+  >   - JWT token generation (SessionId, PlayerId, DisplayName, GameSessionId)
   > - `SessionAuthenticationHandler.cs` - Validate JWT on requests
+  > - `PlayerService.cs` - Create/find players in global registry
 
 - [ ] **Implement reconnection logic**
   Task ID: `table-mgmt-07`
@@ -127,13 +156,17 @@
   > **Implementation**: Create `src/LowRollers.Api/Features/ChipManagement/`
   > **Details**:
   > - `BuyInCommand.cs`
-  >   - Validate amount within table limits (min/max)
-  >   - Set initial chip stack
+  >   - Validate amount within table limits (min/max from TableConfig)
+  >   - Create `SessionTransactions` record (IsCredit=1)
+  >   - Update `GameSessionPlayers.ChipStack`
   >   - Allowed before sitting or between hands
   > - `RebuyCommand.cs`
   >   - Add chips during session
   >   - Same limit validation
-  > - Store chip balance in Redis (session-scoped)
+  >   - Create `SessionTransactions` record
+  > - `CashOutCommand.cs`
+  >   - Record cash-out in `SessionTransactions` (IsCredit=0)
+  > - Cache current chip balance in Redis for real-time access
 
 ---
 

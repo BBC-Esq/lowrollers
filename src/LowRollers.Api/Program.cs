@@ -1,3 +1,4 @@
+using LowRollers.Api.Data;
 using LowRollers.Api.Domain.Evaluation;
 using LowRollers.Api.Domain.Events;
 using LowRollers.Api.Domain.Models;
@@ -15,6 +16,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults (Aspire)
 builder.AddServiceDefaults();
+
+// Add SQL Server DbContext via Aspire integration
+builder.AddSqlServerDbContext<LowRollersDbContext>("lowrollers");
 
 // Add SignalR for real-time communication
 builder.Services.AddSignalR();

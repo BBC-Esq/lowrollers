@@ -13,6 +13,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LowRollers.Api.Tests", "tests\LowRollers.Api.Tests\LowRollers.Api.Tests.csproj", "{988029BC-AB1D-4728-93F9-1E400E89289D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LowRollers.Api.IntegrationTests", "tests\LowRollers.Api.IntegrationTests\LowRollers.Api.IntegrationTests.csproj", "{51CC18BD-9A74-4F27-A14B-A2F7D4337477}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+EndProject
+Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "LowRollers.Database", "src\LowRollers.Database\LowRollers.Database.sqlproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,12 +77,26 @@ Global
 		{988029BC-AB1D-4728-93F9-1E400E89289D}.Release|x64.Build.0 = Release|Any CPU
 		{988029BC-AB1D-4728-93F9-1E400E89289D}.Release|x86.ActiveCfg = Release|Any CPU
 		{988029BC-AB1D-4728-93F9-1E400E89289D}.Release|x86.Build.0 = Release|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Debug|x64.Build.0 = Debug|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Debug|x86.Build.0 = Debug|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Release|Any CPU.Build.0 = Release|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Release|x64.ActiveCfg = Release|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Release|x64.Build.0 = Release|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Release|x86.ActiveCfg = Release|Any CPU
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{988029BC-AB1D-4728-93F9-1E400E89289D} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{51CC18BD-9A74-4F27-A14B-A2F7D4337477} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AD6DA29E-7178-4A34-98A4-1DF12234B66E}
