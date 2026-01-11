@@ -117,12 +117,55 @@ The core poker gameplay engine implementing Texas Hold'em rules with server-auth
 
 ### Domain Models
 
+#### Database Entities (Azure SQL via SQL Server Database Projects)
+
+```
+Players (Global registry)
+  - PlayerId: UNIQUEIDENTIFIER (PK, NEWSEQUENTIALID)
+  - CreatedOn: DATETIMEOFFSET
+  - PlayerName: VARCHAR(100)
+  - PlayerEmail: VARCHAR(255) NULL (optional, for Phase 4)
+  - Avatar: VARBINARY(MAX) NULL
+
+GameSessions (Active game instance)
+  - SessionId: UNIQUEIDENTIFIER (PK)
+  - TableId: UNIQUEIDENTIFIER (FK → GameTables)
+  - StartedOn: DATETIMEOFFSET
+  - EndedOn: DATETIMEOFFSET NULL
+  - TableConfigOverride: VARCHAR(MAX) NULL (JSON)
+
+GameSessionPlayers (Player participation)
+  - SessionId + PlayerId: Composite PK
+  - SeatedOn: DATETIMEOFFSET
+  - DepartedOn: DATETIMEOFFSET NULL
+  - SeatNumber: TINYINT (0-10)
+  - TimeBankSeconds: INT
+
+SessionHands (Hand container)
+  - HandId: UNIQUEIDENTIFIER (PK)
+  - SessionId: UNIQUEIDENTIFIER (FK)
+  - ShuffleSeed: VARBINARY(255)
+  - StartedOn: DATETIMEOFFSET
+  - EndedOn: DATETIMEOFFSET NULL
+
+SessionHandEvents (Event sourcing)
+  - HandDetailId: UNIQUEIDENTIFIER (PK)
+  - SessionId, HandId: FKs
+  - PlayerId: UNIQUEIDENTIFIER NULL (NULL = system event like Deal, Flop, Turn, River)
+  - EventTypeId: TINYINT (SB, BB, Deal, Flop, Turn, River, Check, Bet, Fold, Showdown, Winner)
+  - EventTimestamp: DATETIMEOFFSET
+  - Amount: INT NULL
+  - EventDetails: VARCHAR(MAX) (JSON)
+```
+
+#### In-Memory Domain Models (C#)
+
 ```
 Card (Suit, Rank)
 Deck (Cards[], Shuffle(), Deal())
 Player (Id, DisplayName, ChipStack, SeatPosition, Status, HoleCards)
 Hand (Id, Phase, Pot, SidePots, CommunityCards, ButtonPosition, Events)
-Pot (Amount, EligiblePlayers, Type)
+Pot (Amount, EligiblePlayers, Type) - In-memory only, calculated from events
 PlayerAction (Fold, Check, Call, Raise, AllIn)
 HandPhase (Waiting, Preflop, Flop, Turn, River, Showdown, Complete)
 ```

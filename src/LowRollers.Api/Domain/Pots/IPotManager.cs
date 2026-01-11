@@ -50,4 +50,26 @@ public interface IPotManager
     Dictionary<Guid, decimal> AwardPots(
         List<Pot> pots,
         IReadOnlyDictionary<Guid, List<Guid>> winnersByPot);
+
+    /// <summary>
+    /// Splits a pot amount among winners. Pure math - no game context.
+    /// Caller is responsible for ordering winners (first gets odd chip).
+    /// </summary>
+    /// <param name="amount">Total pot amount to split.</param>
+    /// <param name="orderedWinnerIds">Winners ordered by position (first-to-act first).</param>
+    /// <returns>Dictionary of player ID to amount won.</returns>
+    Dictionary<Guid, decimal> SplitPot(decimal amount, IReadOnlyList<Guid> orderedWinnerIds);
+
+    /// <summary>
+    /// Calculates chips that are uncallable (no opponent can match).
+    /// These chips should be returned to the player rather than placed in a pot.
+    /// </summary>
+    /// <param name="contributions">Dictionary of player ID to total contribution amount.</param>
+    /// <param name="allInPlayerIds">Set of player IDs who are all-in.</param>
+    /// <param name="foldedPlayerIds">Set of player IDs who have folded.</param>
+    /// <returns>Dictionary of player ID to uncallable chip amount.</returns>
+    Dictionary<Guid, decimal> CalculateUncallableChips(
+        IReadOnlyDictionary<Guid, decimal> contributions,
+        IReadOnlySet<Guid> allInPlayerIds,
+        IReadOnlySet<Guid> foldedPlayerIds);
 }

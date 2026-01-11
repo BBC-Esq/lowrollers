@@ -265,12 +265,13 @@ public class PotManagerTests
         // Act
         var pots = _potManager.CollectBets(existingPots, contributions, allInPlayers, foldedPlayers);
 
-        // Assert
-        Assert.Equal(2, pots.Count);
+        // Assert - Only 1 pot because Player2's excess $25 is uncallable
+        // (only Player2 would be eligible for that side pot, so it's not created)
+        Assert.Single(pots);
 
         var mainPot = pots.First(p => p.Type == PotType.Main);
-        // Main pot should have: existing 100 + (25 * 2 players contributing at this level) = 150
-        Assert.True(mainPot.Amount >= 100m);
+        // Main pot should have: existing 100 + (25 from P1) + (25 matched from P2) = 150
+        Assert.Equal(150m, mainPot.Amount);
     }
 
     #endregion
@@ -383,6 +384,60 @@ public class PotManagerTests
     }
 
     [Fact]
+    public void AwardPots_TwoWaySplitWithOddChip_FirstWinnerGetsExtra()
+    {
+        // Classic 2-way split: $15 between 2 players = $7.50 each
+        // One player gets $8, other gets $7
+        // First winner in list (should be first-to-act from button) gets the extra
+        var pot = Pot.CreateMainPot();
+        pot.Amount = 15m;
+        pot.AddEligiblePlayer(Player1);
+        pot.AddEligiblePlayer(Player2);
+
+        var pots = new List<Pot> { pot };
+        // Winners list should be ordered by position (first-to-act first)
+        // PotManager gives odd chip to first in list
+        var winners = new Dictionary<Guid, List<Guid>>
+        {
+            { pot.Id, [Player1, Player2] }
+        };
+
+        var winnings = _potManager.AwardPots(pots, winners);
+
+        Assert.Equal(2, winnings.Count);
+        Assert.Equal(8m, winnings[Player1]);  // First winner gets odd chip
+        Assert.Equal(7m, winnings[Player2]);
+        Assert.Equal(15m, winnings.Values.Sum());
+    }
+
+    [Fact]
+    public void AwardPots_ThreeWaySplitWithOddChips_FirstWinnerGetsRemainder()
+    {
+        // $10 between 3 players = $3 each with $1 remainder
+        // PotManager gives odd chip to first winner in list
+        // (ShowdownHandler orders list so first-to-act from button is first)
+        var pot = Pot.CreateMainPot();
+        pot.Amount = 10m;
+        pot.AddEligiblePlayer(Player1);
+        pot.AddEligiblePlayer(Player2);
+        pot.AddEligiblePlayer(Player3);
+
+        var pots = new List<Pot> { pot };
+        var winners = new Dictionary<Guid, List<Guid>>
+        {
+            { pot.Id, [Player1, Player2, Player3] }
+        };
+
+        var winnings = _potManager.AwardPots(pots, winners);
+
+        Assert.Equal(3, winnings.Count);
+        Assert.Equal(4m, winnings[Player1]);  // First winner gets odd chip
+        Assert.Equal(3m, winnings[Player2]);
+        Assert.Equal(3m, winnings[Player3]);
+        Assert.Equal(10m, winnings.Values.Sum());
+    }
+
+    [Fact]
     public void AwardPots_MainAndSidePots_DifferentWinners()
     {
         // Arrange
@@ -443,6 +498,50 @@ public class PotManagerTests
     }
 
     [Fact]
+    public void AwardPots_AllInPlayerBestHand_SecondBestWinsSidePot()
+    {
+        // Classic scenario: Short stack all-in with best hand overall,
+        // but second-best hand wins the side pot they couldn't contest.
+        //
+        // Example:
+        // - Player1 all-in $50 with pocket Aces (best hand)
+        // - Player2 and Player3 continue betting to $100
+        // - Player2 has Kings (second best), Player3 has Queens (third)
+        // - Player1 wins main pot with Aces
+        // - Player2 wins side pot with Kings (Player1 not eligible)
+
+        var mainPot = Pot.CreateMainPot();
+        mainPot.Amount = 150m;  // $50 x 3 players
+        mainPot.AddEligiblePlayer(Player1);
+        mainPot.AddEligiblePlayer(Player2);
+        mainPot.AddEligiblePlayer(Player3);
+
+        var sidePot = Pot.CreateSidePot([Player2, Player3], 1);
+        sidePot.Amount = 100m;  // Additional $50 x 2 players
+        // Player1 NOT eligible (was all-in for less)
+
+        var pots = new List<Pot> { mainPot, sidePot };
+
+        // Hand rankings (determined by ShowdownHandler):
+        // Player1: Aces (rank 1 - best)
+        // Player2: Kings (rank 2 - second best)
+        // Player3: Queens (rank 3 - third)
+        var winners = new Dictionary<Guid, List<Guid>>
+        {
+            { mainPot.Id, [Player1] },   // Player1 wins main (best hand)
+            { sidePot.Id, [Player2] }    // Player2 wins side (best among eligible)
+        };
+
+        var winnings = _potManager.AwardPots(pots, winners);
+
+        Assert.Equal(2, winnings.Count);
+        Assert.Equal(150m, winnings[Player1]); // Main pot only
+        Assert.Equal(100m, winnings[Player2]); // Side pot (even though Player1 had better hand)
+        Assert.False(winnings.ContainsKey(Player3)); // Queens loses both
+        Assert.Equal(250m, winnings.Values.Sum());
+    }
+
+    [Fact]
     public void AwardPots_NoWinnersForPot_SkipsPot()
     {
         // Arrange
@@ -496,6 +595,226 @@ public class PotManagerTests
         Assert.Equal(100m, winnings[Player1]);
         Assert.Equal(75m, winnings[Player2]);
         Assert.Equal(50m, winnings[Player4]);
+    }
+
+    #endregion
+
+    #region SplitPot Tests
+
+    [Fact]
+    public void SplitPot_EmptyWinners_ReturnsEmptyDictionary()
+    {
+        var result = _potManager.SplitPot(100m, []);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void SplitPot_ZeroAmount_ReturnsEmptyDictionary()
+    {
+        var result = _potManager.SplitPot(0m, [Player1, Player2]);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void SplitPot_SingleWinner_GetsFullAmount()
+    {
+        var result = _potManager.SplitPot(100m, [Player1]);
+
+        Assert.Single(result);
+        Assert.Equal(100m, result[Player1]);
+    }
+
+    [Fact]
+    public void SplitPot_TwoWinners_EvenSplit()
+    {
+        var result = _potManager.SplitPot(100m, [Player1, Player2]);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(50m, result[Player1]);
+        Assert.Equal(50m, result[Player2]);
+    }
+
+    [Fact]
+    public void SplitPot_TwoWinners_OddChipToFirst()
+    {
+        // $15 / 2 = $7 each with $1 remainder
+        // First winner in list gets the odd chip
+        var result = _potManager.SplitPot(15m, [Player1, Player2]);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(8m, result[Player1]);  // First gets odd chip
+        Assert.Equal(7m, result[Player2]);
+        Assert.Equal(15m, result.Values.Sum());
+    }
+
+    [Fact]
+    public void SplitPot_ThreeWinners_EvenSplit()
+    {
+        var result = _potManager.SplitPot(90m, [Player1, Player2, Player3]);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(30m, result[Player1]);
+        Assert.Equal(30m, result[Player2]);
+        Assert.Equal(30m, result[Player3]);
+    }
+
+    [Fact]
+    public void SplitPot_ThreeWinners_OddChipToFirst()
+    {
+        // $10 / 3 = $3 each with $1 remainder
+        var result = _potManager.SplitPot(10m, [Player1, Player2, Player3]);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(4m, result[Player1]);  // First gets odd chip
+        Assert.Equal(3m, result[Player2]);
+        Assert.Equal(3m, result[Player3]);
+        Assert.Equal(10m, result.Values.Sum());
+    }
+
+    [Fact]
+    public void SplitPot_FourWinners_OddChipsDistributedInOrder()
+    {
+        // $10 / 4 = $2 each with $2 remainder
+        // Standard casino rules: odd chips distributed one at a time in position order
+        var result = _potManager.SplitPot(10m, [Player1, Player2, Player3, Player4]);
+
+        Assert.Equal(4, result.Count);
+        Assert.Equal(3m, result[Player1]);  // First odd chip
+        Assert.Equal(3m, result[Player2]);  // Second odd chip
+        Assert.Equal(2m, result[Player3]);
+        Assert.Equal(2m, result[Player4]);
+        Assert.Equal(10m, result.Values.Sum());
+    }
+
+    [Fact]
+    public void SplitPot_LargeAmount_HandlesCorrectly()
+    {
+        // $1000 / 3 = $333 each with $1 remainder
+        var result = _potManager.SplitPot(1000m, [Player1, Player2, Player3]);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(334m, result[Player1]);
+        Assert.Equal(333m, result[Player2]);
+        Assert.Equal(333m, result[Player3]);
+        Assert.Equal(1000m, result.Values.Sum());
+    }
+
+    [Fact]
+    public void SplitPot_OrderMatters_FirstInListGetsOddChip()
+    {
+        // Verify that the first player in the list gets the odd chip
+        // regardless of player ID
+        var result1 = _potManager.SplitPot(15m, [Player1, Player2]);
+        var result2 = _potManager.SplitPot(15m, [Player2, Player1]);
+
+        // Player1 first -> Player1 gets $8
+        Assert.Equal(8m, result1[Player1]);
+        Assert.Equal(7m, result1[Player2]);
+
+        // Player2 first -> Player2 gets $8
+        Assert.Equal(8m, result2[Player2]);
+        Assert.Equal(7m, result2[Player1]);
+    }
+
+    #endregion
+
+    #region Side Pot Odd Chip Tests
+
+    [Fact]
+    public void AwardPots_SidePotWithOddChip_FirstWinnerGetsRemainder()
+    {
+        // Scenario: Main pot won by single player, side pot split with odd chip
+        var mainPot = Pot.CreateMainPot();
+        mainPot.Amount = 150m;
+        mainPot.AddEligiblePlayer(Player1);
+        mainPot.AddEligiblePlayer(Player2);
+        mainPot.AddEligiblePlayer(Player3);
+
+        var sidePot = Pot.CreateSidePot([Player2, Player3], 1);
+        sidePot.Amount = 25m;  // Odd amount for 2-way split
+
+        var pots = new List<Pot> { mainPot, sidePot };
+        var winners = new Dictionary<Guid, List<Guid>>
+        {
+            { mainPot.Id, [Player1] },
+            { sidePot.Id, [Player2, Player3] }  // Split the side pot
+        };
+
+        var winnings = _potManager.AwardPots(pots, winners);
+
+        Assert.Equal(3, winnings.Count);
+        Assert.Equal(150m, winnings[Player1]);  // Full main pot
+        Assert.Equal(13m, winnings[Player2]);   // First in list gets odd chip
+        Assert.Equal(12m, winnings[Player3]);
+        Assert.Equal(175m, winnings.Values.Sum());
+    }
+
+    [Fact]
+    public void AwardPots_MultipleSidePotsWithOddChips_EachHandledCorrectly()
+    {
+        // Complex scenario: multiple pots all with odd chip splits
+        var mainPot = Pot.CreateMainPot();
+        mainPot.Amount = 10m;  // $10 / 2 = $5 each, no remainder
+        mainPot.AddEligiblePlayer(Player1);
+        mainPot.AddEligiblePlayer(Player2);
+        mainPot.AddEligiblePlayer(Player3);
+
+        var sidePot1 = Pot.CreateSidePot([Player2, Player3], 1);
+        sidePot1.Amount = 15m;  // $15 / 2 = $7 each with $1 remainder
+
+        var sidePot2 = Pot.CreateSidePot([Player3, Player4], 2);
+        sidePot2.Amount = 21m;  // $21 / 2 = $10 each with $1 remainder
+
+        var pots = new List<Pot> { mainPot, sidePot1, sidePot2 };
+        var winners = new Dictionary<Guid, List<Guid>>
+        {
+            { mainPot.Id, [Player1, Player2] },     // Even split
+            { sidePot1.Id, [Player2, Player3] },    // Odd split - Player2 first
+            { sidePot2.Id, [Player3, Player4] }     // Odd split - Player3 first
+        };
+
+        var winnings = _potManager.AwardPots(pots, winners);
+
+        // Main pot: $10 / 2 = $5 each
+        // Side pot 1: $15 -> Player2 gets $8, Player3 gets $7
+        // Side pot 2: $21 -> Player3 gets $11, Player4 gets $10
+        Assert.Equal(5m, winnings[Player1]);
+        Assert.Equal(5m + 8m, winnings[Player2]);  // $13
+        Assert.Equal(7m + 11m, winnings[Player3]); // $18
+        Assert.Equal(10m, winnings[Player4]);
+        Assert.Equal(46m, winnings.Values.Sum());
+    }
+
+    [Fact]
+    public void AwardPots_ThreeWaySidePotSplit_OddChipsDistributedInOrder()
+    {
+        // Side pot with 3-way split and 2 odd chips
+        var mainPot = Pot.CreateMainPot();
+        mainPot.Amount = 100m;
+        mainPot.AddEligiblePlayer(Player1);
+        mainPot.AddEligiblePlayer(Player2);
+        mainPot.AddEligiblePlayer(Player3);
+        mainPot.AddEligiblePlayer(Player4);
+
+        var sidePot = Pot.CreateSidePot([Player2, Player3, Player4], 1);
+        sidePot.Amount = 20m;  // $20 / 3 = $6 each with $2 remainder
+
+        var pots = new List<Pot> { mainPot, sidePot };
+        var winners = new Dictionary<Guid, List<Guid>>
+        {
+            { mainPot.Id, [Player1] },
+            { sidePot.Id, [Player2, Player3, Player4] }  // 3-way split
+        };
+
+        var winnings = _potManager.AwardPots(pots, winners);
+
+        Assert.Equal(100m, winnings[Player1]);
+        Assert.Equal(7m, winnings[Player2]);   // First odd chip
+        Assert.Equal(7m, winnings[Player3]);   // Second odd chip
+        Assert.Equal(6m, winnings[Player4]);
+        Assert.Equal(120m, winnings.Values.Sum());
     }
 
     #endregion
@@ -577,7 +896,8 @@ public class PotManagerTests
     [Fact]
     public void ComplexScenario_HeadsUpAllIn()
     {
-        // Scenario: Heads-up, both players all-in
+        // Scenario: Heads-up, both players all-in at different amounts
+        // Player1 bets $100, Player2 can only call $80
         var contributions = new Dictionary<Guid, decimal>
         {
             { Player1, 100m },
@@ -589,18 +909,14 @@ public class PotManagerTests
         // Act
         var pots = _potManager.CalculatePots(contributions, allInPlayers, foldedPlayers);
 
-        // Assert
-        Assert.Equal(2, pots.Count);
+        // Assert - Only 1 pot because Player1's excess $20 is uncallable
+        // Uncallable chips are NOT put into a side pot - they're returned via CalculateUncallableChips
+        Assert.Single(pots);
 
         // Main pot: $80 x 2 = $160
         var mainPot = pots.First(p => p.Type == PotType.Main);
         Assert.Equal(160m, mainPot.Amount);
-
-        // Side pot: $20 (Player1's excess) - only 1 eligible player
-        var sidePot = pots.First(p => p.Type == PotType.Side);
-        Assert.Equal(20m, sidePot.Amount);
-        Assert.Single(sidePot.EligiblePlayerIds);
-        Assert.Contains(Player1, sidePot.EligiblePlayerIds);
+        Assert.Equal(2, mainPot.EligiblePlayerIds.Count);
     }
 
     [Fact]

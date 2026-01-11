@@ -89,6 +89,14 @@ public sealed class PotManager : IPotManager
 
             if (potAmount > 0)
             {
+                // Skip pots where only one player is eligible (uncallable chips)
+                // These chips should be returned to the player via CalculateUncallableChips
+                if (eligiblePlayers.Count < 2 && potOrder > 0)
+                {
+                    previousLevel = level;
+                    continue;
+                }
+
                 var pot = potOrder == 0
                     ? Pot.CreateMainPot()
                     : Pot.CreateSidePot(eligiblePlayers, potOrder);
@@ -287,6 +295,14 @@ public sealed class PotManager : IPotManager
 
             if (potAmount > 0)
             {
+                // Skip pots where only one player is eligible (uncallable chips)
+                // These chips should be returned to the player via CalculateUncallableChips
+                if (eligiblePlayers.Count < 2)
+                {
+                    previousLevel = level;
+                    continue;
+                }
+
                 var sidePot = Pot.CreateSidePot(eligiblePlayers, nextSidePotOrder++);
                 sidePot.Amount = potAmount;
                 newPots.Add(sidePot);
@@ -331,31 +347,115 @@ public sealed class PotManager : IPotManager
                 continue;
             }
 
-            // Split pot evenly among winners
-            var sharePerWinner = Math.Floor(pot.Amount / eligibleWinners.Count * 100) / 100;
-            var remainder = pot.Amount - (sharePerWinner * eligibleWinners.Count);
+            Dictionary<Guid, decimal> potWinnings;
 
-            for (int i = 0; i < eligibleWinners.Count; i++)
+            if (eligibleWinners.Count == 1)
             {
-                var winnerId = eligibleWinners[i];
-                var share = sharePerWinner;
-
-                // First winner gets the remainder (odd chips)
-                if (i == 0)
+                // Single winner takes entire pot - no split needed
+                potWinnings = new Dictionary<Guid, decimal>
                 {
-                    share += remainder;
-                }
+                    { eligibleWinners[0], pot.Amount }
+                };
+            }
+            else
+            {
+                // Multiple winners - use SplitPot for the calculation
+                potWinnings = SplitPot(pot.Amount, eligibleWinners);
+            }
 
+            // Accumulate winnings (player may win multiple pots)
+            foreach (var (winnerId, amount) in potWinnings)
+            {
                 if (!winnings.ContainsKey(winnerId))
                 {
                     winnings[winnerId] = 0;
                 }
-                winnings[winnerId] += share;
+                winnings[winnerId] += amount;
             }
 
             pot.Amount = 0; // Pot has been awarded
         }
 
         return winnings;
+    }
+
+    /// <inheritdoc/>
+    public Dictionary<Guid, decimal> SplitPot(decimal amount, IReadOnlyList<Guid> orderedWinnerIds)
+    {
+        var winnings = new Dictionary<Guid, decimal>();
+
+        if (orderedWinnerIds.Count == 0 || amount <= 0)
+        {
+            return winnings;
+        }
+
+        // Split evenly, then distribute odd chips one at a time in position order
+        // Caller orders winners by position (first-to-act from button first)
+        var sharePerWinner = Math.Floor(amount / orderedWinnerIds.Count);
+        var remainder = (int)(amount - (sharePerWinner * orderedWinnerIds.Count));
+
+        for (int i = 0; i < orderedWinnerIds.Count; i++)
+        {
+            var winnerId = orderedWinnerIds[i];
+            var share = sharePerWinner;
+
+            // Distribute odd chips one at a time in position order
+            if (i < remainder)
+            {
+                share += 1;
+            }
+
+            winnings[winnerId] = share;
+        }
+
+        return winnings;
+    }
+
+    /// <inheritdoc/>
+    public Dictionary<Guid, decimal> CalculateUncallableChips(
+        IReadOnlyDictionary<Guid, decimal> contributions,
+        IReadOnlySet<Guid> allInPlayerIds,
+        IReadOnlySet<Guid> foldedPlayerIds)
+    {
+        var uncallable = new Dictionary<Guid, decimal>();
+
+        if (contributions.Count == 0)
+        {
+            return uncallable;
+        }
+
+        // Active contributors (not folded)
+        var activeContributors = contributions
+            .Where(c => c.Value > 0 && !foldedPlayerIds.Contains(c.Key))
+            .ToDictionary(c => c.Key, c => c.Value);
+
+        if (activeContributors.Count < 2)
+        {
+            // If only one active contributor, all other players folded.
+            // This player wins uncontested - handled by GameOrchestrator immediately
+            // when last opponent folds (no showdown occurs).
+            return uncallable;
+        }
+
+        // Find the second-highest contribution among active players
+        var sortedContributions = activeContributors.Values.OrderByDescending(v => v).ToList();
+        var maxContribution = sortedContributions[0];
+        var secondMaxContribution = sortedContributions.Count > 1 ? sortedContributions[1] : 0m;
+
+        // For each player with contribution > secondMaxContribution,
+        // the excess is uncallable and should be returned
+        foreach (var (playerId, contribution) in activeContributors)
+        {
+            if (contribution > secondMaxContribution)
+            {
+                var excessAmount = contribution - secondMaxContribution;
+                if (excessAmount > 0)
+                {
+                    uncallable[playerId] = excessAmount;
+                }
+            }
+        }
+
+        return uncallable;
     }
 }

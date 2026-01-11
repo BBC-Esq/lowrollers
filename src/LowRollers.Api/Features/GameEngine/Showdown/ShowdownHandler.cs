@@ -61,6 +61,9 @@ public sealed partial class ShowdownHandler : IShowdownHandler
             return await AwardToSinglePlayerAsync(table, hand, playersInHand[0], ct);
         }
 
+        // Return uncallable chips to players before distributing pots
+        ReturnUncallableChips(table, hand);
+
         // Determine show order
         var showOrder = GetShowOrderInternal(table, hand, playersInHand);
 
@@ -143,6 +146,47 @@ public sealed partial class ShowdownHandler : IShowdownHandler
     }
 
     #region Private Helpers
+
+    private void ReturnUncallableChips(Table table, Hand hand)
+    {
+        // Build contributions dictionary from player bets
+        var contributions = new Dictionary<Guid, decimal>();
+        var allInPlayerIds = new HashSet<Guid>();
+        var foldedPlayerIds = new HashSet<Guid>();
+
+        foreach (var player in table.Players.Values)
+        {
+            if (!hand.PlayerIds.Contains(player.Id))
+            {
+                continue;
+            }
+
+            contributions[player.Id] = player.TotalBetThisHand;
+
+            if (player.Status == PlayerStatus.AllIn)
+            {
+                allInPlayerIds.Add(player.Id);
+            }
+            else if (player.Status == PlayerStatus.Folded)
+            {
+                foldedPlayerIds.Add(player.Id);
+            }
+        }
+
+        // Calculate uncallable chips
+        var uncallableChips = _potManager.CalculateUncallableChips(
+            contributions, allInPlayerIds, foldedPlayerIds);
+
+        // Return uncallable chips to players
+        foreach (var (playerId, amount) in uncallableChips)
+        {
+            if (table.Players.TryGetValue(playerId, out var player))
+            {
+                player.ChipStack += amount;
+                Log.UncallableChipsReturned(_logger, player.DisplayName, amount);
+            }
+        }
+    }
 
     private static List<Player> GetPlayersInHand(Table table, Hand hand)
     {
@@ -482,8 +526,8 @@ public sealed partial class ShowdownHandler : IShowdownHandler
 
             var winningHand = evaluatedPlayers[winners[0]].Hand;
 
-            // Calculate split amounts
-            var winnerAmounts = CalculateSplitAmounts(table, hand, pot.Amount, winners);
+            // Calculate split amounts - order winners by position, delegate math to PotManager
+            var winnerAmounts = CalculateSplitAmounts(table, hand.ButtonPosition, pot.Amount, winners);
 
             awards.Add(new PotAward
             {
@@ -500,52 +544,39 @@ public sealed partial class ShowdownHandler : IShowdownHandler
         return awards;
     }
 
-    private static Dictionary<Guid, decimal> CalculateSplitAmounts(
+    private Dictionary<Guid, decimal> CalculateSplitAmounts(
         Table table,
-        Hand hand,
+        int buttonPosition,
         decimal potAmount,
         List<Guid> winners)
     {
-        var amounts = new Dictionary<Guid, decimal>();
-
         if (winners.Count == 0)
         {
-            return amounts;
+            return new Dictionary<Guid, decimal>();
         }
 
         if (winners.Count == 1)
         {
-            amounts[winners[0]] = potAmount;
-            return amounts;
+            return new Dictionary<Guid, decimal> { [winners[0]] = potAmount };
         }
 
-        // Split evenly, with remainder going to first player from button
-        var share = Math.Floor(potAmount / winners.Count * 100) / 100;
-        var remainder = potAmount - (share * winners.Count);
+        // Order winners by position from button (first-to-act gets odd chip)
+        var orderedWinners = OrderWinnersByPosition(table, buttonPosition, winners);
 
-        // Order winners by position from button
-        var buttonPos = hand.ButtonPosition;
-        var orderedWinners = winners
+        // Delegate split math to PotManager
+        return _potManager.SplitPot(potAmount, orderedWinners);
+    }
+
+    private static List<Guid> OrderWinnersByPosition(
+        Table table,
+        int buttonPosition,
+        List<Guid> winners)
+    {
+        return winners
             .Select(id => (Id: id, Pos: table.Players.TryGetValue(id, out var p) ? p.SeatPosition : 0))
-            .OrderBy(w => GetPositionFromButton(w.Pos, buttonPos))
+            .OrderBy(w => GetPositionFromButton(w.Pos, buttonPosition))
             .Select(w => w.Id)
             .ToList();
-
-        for (int i = 0; i < orderedWinners.Count; i++)
-        {
-            var winnerId = orderedWinners[i];
-            var amount = share;
-
-            // First winner from button gets remainder
-            if (i == 0 && remainder > 0)
-            {
-                amount += remainder;
-            }
-
-            amounts[winnerId] = amount;
-        }
-
-        return amounts;
     }
 
     private static int GetPositionFromButton(int seatPosition, int buttonPosition)
@@ -680,5 +711,8 @@ public sealed partial class ShowdownHandler : IShowdownHandler
 
         [LoggerMessage(Level = LogLevel.Warning, Message = "Pot {PotId} has no eligible players with shown hands")]
         public static partial void PotHasNoEligiblePlayers(ILogger logger, Guid potId);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Returned {Amount} uncallable chips to {DisplayName}")]
+        public static partial void UncallableChipsReturned(ILogger logger, string displayName, decimal amount);
     }
 }

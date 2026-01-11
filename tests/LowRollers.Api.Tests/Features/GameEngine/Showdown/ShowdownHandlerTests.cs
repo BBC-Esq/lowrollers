@@ -63,13 +63,38 @@ public class ShowdownHandlerTests
         return table;
     }
 
+    private static Table CreateTableWithSpecificSeats(int[] seatPositions, int buttonPosition)
+    {
+        var table = new Table
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Table",
+            SmallBlind = 1m,
+            BigBlind = 2m,
+            ButtonPosition = buttonPosition
+        };
+
+        for (int i = 0; i < seatPositions.Length; i++)
+        {
+            var player = Player.Create(
+                Guid.NewGuid(),
+                $"PlayerSeat{seatPositions[i]}",
+                seatPositions[i],
+                1000m);
+            player.Status = PlayerStatus.Active;
+            table.Players[player.Id] = player;
+        }
+
+        return table;
+    }
+
     private static Hand CreateShowdownHand(Table table, decimal potAmount = 100m)
     {
         var playerIds = table.Players.Keys.ToList();
         var hand = Hand.Create(
             table.Id,
             1,
-            1,
+            table.ButtonPosition,  // Use table's button position
             2,
             3,
             1m,
@@ -210,6 +235,132 @@ public class ShowdownHandlerTests
         // First player from button gets the extra cent
         var winnings = result.TotalWinnings;
         Assert.True(winnings.Values.Sum() == 101m);
+    }
+
+    [Fact]
+    public async Task ExecuteShowdownAsync_OddChipSplit_GoesToFirstToActFromButton()
+    {
+        // Scenario: Button at seat 5, winners at seats 3 and 7
+        // Seat 7 is first to act (left of button), gets the odd chip
+        // Pot: $15 → Seat 7 gets $8, Seat 3 gets $7
+        var table = CreateTableWithSpecificSeats([3, 7], buttonPosition: 5);
+        var hand = CreateShowdownHand(table, 15m);
+
+        var playerAtSeat3 = table.Players.Values.First(p => p.SeatPosition == 3);
+        var playerAtSeat7 = table.Players.Values.First(p => p.SeatPosition == 7);
+
+        // Both players have identical hands (tie)
+        playerAtSeat3.HoleCards = [C(Rank.Three, Suit.Hearts), C(Rank.Four, Suit.Diamonds)];
+        playerAtSeat7.HoleCards = [C(Rank.Three, Suit.Spades), C(Rank.Four, Suit.Clubs)];
+
+        var result = await _handler.ExecuteShowdownAsync(table);
+
+        Assert.True(result.IsSuccess);
+
+        // Seat 7 is left of button (seat 5), so seat 7 is first to act
+        // First to act gets the odd chip
+        Assert.Equal(8m, result.TotalWinnings[playerAtSeat7.Id]);
+        Assert.Equal(7m, result.TotalWinnings[playerAtSeat3.Id]);
+        Assert.Equal(15m, result.TotalWinnings.Values.Sum());
+    }
+
+    [Fact]
+    public async Task ExecuteShowdownAsync_OddChipSplit_WrapsAroundTable()
+    {
+        // Scenario: Button at seat 8, winners at seats 2 and 9
+        // Seat 9 is first to act (immediately left of button 8), gets the odd chip
+        // Pot: $15 → Seat 9 gets $8, Seat 2 gets $7
+        var table = CreateTableWithSpecificSeats([2, 9], buttonPosition: 8);
+        var hand = CreateShowdownHand(table, 15m);
+
+        var playerAtSeat2 = table.Players.Values.First(p => p.SeatPosition == 2);
+        var playerAtSeat9 = table.Players.Values.First(p => p.SeatPosition == 9);
+
+        // Identical hands
+        playerAtSeat2.HoleCards = [C(Rank.Three, Suit.Hearts), C(Rank.Four, Suit.Diamonds)];
+        playerAtSeat9.HoleCards = [C(Rank.Three, Suit.Spades), C(Rank.Four, Suit.Clubs)];
+
+        var result = await _handler.ExecuteShowdownAsync(table);
+
+        Assert.True(result.IsSuccess);
+
+        // Seat 9 is left of button (seat 8), so seat 9 is first to act
+        Assert.Equal(8m, result.TotalWinnings[playerAtSeat9.Id]);
+        Assert.Equal(7m, result.TotalWinnings[playerAtSeat2.Id]);
+    }
+
+    [Fact]
+    public async Task ExecuteShowdownAsync_ThreeWaySplitWithOddChip_FirstToActGetsExtra()
+    {
+        // Scenario: Button at seat 1, winners at seats 3, 6, 9
+        // Seat 3 is first to act (first left of button 1)
+        // Pot: $10 with 3 winners → $10 / 3 = $3.33, floor to $3.00 each = $9.00
+        // Remainder: $1.00 goes to first to act (seat 3)
+        // Seat 3 gets $4, seats 6 and 9 get $3 each
+        var table = CreateTableWithSpecificSeats([3, 6, 9], buttonPosition: 1);
+        var hand = CreateShowdownHand(table, 10m);
+
+        var playerAtSeat3 = table.Players.Values.First(p => p.SeatPosition == 3);
+        var playerAtSeat6 = table.Players.Values.First(p => p.SeatPosition == 6);
+        var playerAtSeat9 = table.Players.Values.First(p => p.SeatPosition == 9);
+
+        // Identical hands
+        playerAtSeat3.HoleCards = [C(Rank.Three, Suit.Hearts), C(Rank.Four, Suit.Diamonds)];
+        playerAtSeat6.HoleCards = [C(Rank.Three, Suit.Spades), C(Rank.Four, Suit.Clubs)];
+        playerAtSeat9.HoleCards = [C(Rank.Three, Suit.Diamonds), C(Rank.Four, Suit.Hearts)];
+
+        var result = await _handler.ExecuteShowdownAsync(table);
+
+        Assert.True(result.IsSuccess);
+
+        // Seat 3 is first to act from button 1, gets the extra $1
+        Assert.Equal(4m, result.TotalWinnings[playerAtSeat3.Id]);
+        Assert.Equal(3m, result.TotalWinnings[playerAtSeat6.Id]);
+        Assert.Equal(3m, result.TotalWinnings[playerAtSeat9.Id]);
+        Assert.Equal(10m, result.TotalWinnings.Values.Sum());
+    }
+
+    [Fact]
+    public async Task ExecuteShowdownAsync_SidePotOddChip_FirstToActInSidePotGetsExtra()
+    {
+        // Scenario: 3 players, button at seat 1
+        // Seats 3, 6, 9 - Player at seat 3 is all-in (short stack)
+        // Main pot: $30 (all 3 eligible) - won by seat 3 (best hand)
+        // Side pot: $15 (seats 6 and 9 eligible) - tied between 6 and 9
+        // Side pot split: Seat 6 is first to act among side pot eligible players
+        // Seat 6 gets $8, Seat 9 gets $7
+        var table = CreateTableWithSpecificSeats([3, 6, 9], buttonPosition: 1);
+        var hand = CreateShowdownHand(table, 30m);
+
+        // Create side pot with only seats 6 and 9 eligible
+        var playerAtSeat3 = table.Players.Values.First(p => p.SeatPosition == 3);
+        var playerAtSeat6 = table.Players.Values.First(p => p.SeatPosition == 6);
+        var playerAtSeat9 = table.Players.Values.First(p => p.SeatPosition == 9);
+
+        var sidePot = Pot.CreateSidePot([playerAtSeat6.Id, playerAtSeat9.Id], 1);
+        sidePot.Amount = 15m;
+        hand.Pots.Add(sidePot);
+
+        // Seat 3 has best hand (wins main pot)
+        playerAtSeat3.HoleCards = [C(Rank.Ace, Suit.Hearts), C(Rank.Ace, Suit.Diamonds)];
+        // Seats 6 and 9 have identical hands (tie for side pot)
+        playerAtSeat6.HoleCards = [C(Rank.Three, Suit.Hearts), C(Rank.Four, Suit.Diamonds)];
+        playerAtSeat9.HoleCards = [C(Rank.Three, Suit.Spades), C(Rank.Four, Suit.Clubs)];
+
+        var result = await _handler.ExecuteShowdownAsync(table);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.PotAwards.Count);
+
+        // Main pot: Seat 3 wins all $30
+        Assert.Equal(30m, result.TotalWinnings[playerAtSeat3.Id]);
+
+        // Side pot: Seat 6 is first to act (left of button), gets odd chip
+        // Total for seat 6: $8, Total for seat 9: $7
+        Assert.Equal(8m, result.TotalWinnings[playerAtSeat6.Id]);
+        Assert.Equal(7m, result.TotalWinnings[playerAtSeat9.Id]);
+
+        Assert.Equal(45m, result.TotalWinnings.Values.Sum()); // 30 + 15
     }
 
     [Fact]

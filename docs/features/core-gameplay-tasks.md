@@ -259,7 +259,7 @@
   > - Accessibility: aria-labels on all interactive elements
   > - Effect-based value clamping when betting context changes
 
-- [ ] **Create action timer component**
+- [x] **Create action timer component**
   Task ID: `core-gameplay-19`
   > **Implementation**: Create `src/LowRollers.Web/src/app/features/game/action-timer/`
   > **Design Reference**: `docs/designs/poker-table-mockup-v4.html` - `.action-timer-bar`, `.timer-bar-progress`, `.timer-text`
@@ -272,7 +272,7 @@
   > - Also show timer in action panel left section
   > - Use PrimeNG ProgressBar
 
-- [ ] **Implement keyboard hotkeys**
+- [x] **Implement keyboard hotkeys**
   Task ID: `core-gameplay-20`
   > **Implementation**: Add to `src/LowRollers.Web/src/app/features/game/action-panel/`
   > **Design Reference**: `docs/designs/poker-table-mockup-v4.html` - `.hotkey` class on buttons
@@ -288,7 +288,7 @@
 
 ## Testing
 
-- [ ] **Create hand evaluation integration tests**
+- [x] **Create hand evaluation integration tests**
   Task ID: `core-gameplay-21`
   > **Implementation**: Create `tests/LowRollers.Api.Tests/Domain/Evaluation/`
   > **Details**:
@@ -300,7 +300,7 @@
   > - Edge cases: ties, split pots, wheel straight (A-2-3-4-5)
   > - Note: Library handles hand ranking logic; tests focus on integration correctness
 
-- [ ] **Create pot calculation unit tests**
+- [x] **Create pot calculation unit tests**
   Task ID: `core-gameplay-22`
   > **Implementation**: Create `tests/LowRollers.Api.Tests/Domain/Pots/`
   > **Details**:
@@ -310,7 +310,7 @@
   > - Split pots with side pots
   > - All-in for exact amount (no side pot)
 
-- [ ] **Create game flow integration tests**
+- [x] **Create game flow integration tests**
   Task ID: `core-gameplay-23`
   > **Implementation**: Create `tests/LowRollers.Api.IntegrationTests/GameEngine/`
   > **Details**:

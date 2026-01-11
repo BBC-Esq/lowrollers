@@ -12,7 +12,8 @@
 | Backend | .NET 10.0 / ASP.NET Core | C# backend services |
 | Real-time | SignalR | WebSocket-based for <100ms latency |
 | Video | LiveKit | Self-hosted WebRTC SFU |
-| Database | Azure PostgreSQL | Primary data store |
+| Database | Azure SQL Database | Primary data store |
+| Schema | SQL Server Database Projects | Version-controlled schema (see `LowRollers.Database`) |
 | Cache | Redis | Session and real-time state |
 | Hosting | Azure Container Apps | With .NET Aspire orchestration |
 

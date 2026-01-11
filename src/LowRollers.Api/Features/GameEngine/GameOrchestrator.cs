@@ -508,6 +508,7 @@ public sealed partial class GameOrchestrator : IGameOrchestrator
         {
             // Run out remaining cards
             newCards = await RunOutCardsAsync(hand, ct);
+            hand.CurrentPlayerId = null; // Clear current player - all-in runout, no more betting actions
             return new ActionResult
             {
                 IsSuccess = true, Hand = hand, BettingRoundComplete = true,
@@ -527,6 +528,7 @@ public sealed partial class GameOrchestrator : IGameOrchestrator
 
         if (hand.Phase == HandPhase.Showdown)
         {
+            hand.CurrentPlayerId = null; // Clear current player - no more betting actions needed
             return new ActionResult
             {
                 IsSuccess = true, Hand = hand, BettingRoundComplete = true,

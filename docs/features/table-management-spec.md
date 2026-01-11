@@ -129,29 +129,89 @@ Table creation, guest access, invite links, and session management. This is the 
 
 ### Domain Models
 
-```
-Table
-  - Id: Guid
-  - InviteCode: string (8-12 chars, cryptographically secure)
-  - InviteCodeHash: string (stored, not plain text)
-  - Password: string? (optional, hashed)
-  - HostSessionId: Guid
-  - Name: string
-  - Settings: TableSettings
-  - Status: TableStatus (Waiting, Playing, Paused, Closed)
-  - CreatedAt: DateTime
-  - Players: List<Player>
-  - BannedNames: List<string>
+#### Database Entities (Azure SQL via SQL Server Database Projects)
 
-GuestSession
+```
+GameTables (Reusable table templates)
+  - TableId: UNIQUEIDENTIFIER (PK, NEWSEQUENTIALID)
+  - CreatedOn: DATETIMEOFFSET
+  - CreatedBy: UNIQUEIDENTIFIER (FK → Players)
+  - ModifiedOn: DATETIMEOFFSET
+  - ModifiedBy: UNIQUEIDENTIFIER (FK → Players)
+  - TableName: VARCHAR(100)
+  - GameId: TINYINT (FK → Games, e.g., Texas Holdem)
+  - TableOwner: UNIQUEIDENTIFIER (FK → Players)
+  - TableConfig: VARCHAR(MAX) (JSON - blinds, buy-in limits, timers, etc.)
+
+GameSessions (Active game instances)
+  - SessionId: UNIQUEIDENTIFIER (PK, NEWSEQUENTIALID)
+  - TableId: UNIQUEIDENTIFIER (FK → GameTables)
+  - StartedOn: DATETIMEOFFSET
+  - EndedOn: DATETIMEOFFSET NULL
+  - TableConfigOverride: VARCHAR(MAX) NULL (JSON - per-session overrides)
+  - InviteCodeHash: VARCHAR(255) (hashed invite code)
+  - Password: VARCHAR(255) NULL (optional, hashed)
+
+Players (Global player registry)
+  - PlayerId: UNIQUEIDENTIFIER (PK, NEWSEQUENTIALID)
+  - CreatedOn: DATETIMEOFFSET
+  - PlayerName: VARCHAR(100)
+  - PlayerEmail: VARCHAR(255) NULL (optional for guest access)
+  - Avatar: VARBINARY(MAX) NULL
+
+GameSessionPlayers (Player-session participation)
+  - SessionId: UNIQUEIDENTIFIER (FK, PK part)
+  - PlayerId: UNIQUEIDENTIFIER (FK, PK part)
+  - SeatedOn: DATETIMEOFFSET
+  - DepartedOn: DATETIMEOFFSET NULL
+  - SeatNumber: TINYINT (1-10, 0 = standing)
+  - TimeBankSeconds: INT DEFAULT 0
+  - ChipStack: INT (session-scoped balance)
+  - IsHost: BIT
+
+SessionTransactions (Buy-in/cash-out tracking)
+  - SessionTransactionId: UNIQUEIDENTIFIER (PK)
+  - SessionId: UNIQUEIDENTIFIER (FK)
+  - PlayerId: UNIQUEIDENTIFIER (FK)
+  - TransactionDate: DATETIMEOFFSET
+  - IsCredit: BIT (1=buy-in, 0=cash-out)
+  - Amount: INT
+
+TableTemplates (Saved configurations)
+  - TemplateId: UNIQUEIDENTIFIER (PK, NEWSEQUENTIALID)
+  - OwnerId: UNIQUEIDENTIFIER (FK → Players)
+  - TemplateName: VARCHAR(100)
+  - ConfigJson: VARCHAR(MAX)
+  - CreatedOn: DATETIMEOFFSET
+
+Games (Lookup table)
+  - GameId: TINYINT (PK)
+  - GameName: VARCHAR(50) (e.g., "Texas Holdem")
+```
+
+#### In-Memory/Redis Models (C#)
+
+```
+GuestSession (Redis - ephemeral session state)
   - Id: Guid
+  - PlayerId: Guid (references global Players)
   - DisplayName: string
-  - TableId: Guid
+  - SessionId: Guid (references GameSessions)
   - ChipStack: decimal
   - SeatPosition: int?
   - ConnectedAt: DateTime
   - LastSeenAt: DateTime
   - Status: SessionStatus (Connected, Disconnected, Expired)
+
+Table (In-memory aggregate)
+  - Id: Guid (maps to GameTables.TableId)
+  - SessionId: Guid (maps to GameSessions.SessionId)
+  - InviteCode: string (plain text, stored as hash in DB)
+  - Name: string
+  - Settings: TableSettings (from TableConfig JSON)
+  - Status: TableStatus (Waiting, Playing, Paused, Closed)
+  - Players: List<Player>
+  - BannedNames: List<string>
 ```
 
 ### API Endpoints

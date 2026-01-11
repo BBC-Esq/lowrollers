@@ -169,8 +169,16 @@ Development is structured in 4 phases. Each phase builds on the previous.
 - **Rationale:** P2P struggles at 10 participants; Twilio/Daily.co incur per-minute costs unsuitable for monthly 4-hour sessions
 
 #### Database
-- **Primary:** Azure PostgreSQL for game state and hand history
+- **Primary:** Azure SQL Database for game state and hand history
+- **Schema Management:** SQL Server Database Projects (.sqlproj) for version-controlled schema
 - **Cache:** Redis for session state and real-time caching
+- **Data Architecture:** Adopts Table/Session separation pattern:
+  - `GameTables` - Reusable table templates with JSON configuration
+  - `GameSessions` - Active game instances linked to tables
+  - `Players` - Global player registry (supports guest access with optional email)
+  - `GameSessionPlayers` - Links players to sessions with seat positions
+  - `TableTemplates` - Saved table configurations for quick setup
+  - `SessionHandEvents` - Event sourcing with NULL PlayerId for system events
 
 #### Hosting
 - **Platform:** Azure Container Apps
@@ -275,6 +283,24 @@ Friends can play a full evening session (4+ hours) with bomb pots and button mon
 ---
 
 ## Refinement History
+
+### January 9, 2026
+
+**Changes:**
+- [MODIFIED] Database: Azure PostgreSQL → Azure SQL Database
+- [ADDED] SQL Server Database Projects (.sqlproj) for schema management
+- [MODIFIED] Data architecture: Adopted Table/Session separation pattern from friend's SQL Server design
+  - `GameTables` (template) → `GameSessions` (instance) separation
+  - Sessions can override table config via `TableConfigOverride`
+- [ADDED] Global `Players` registry table (supports Phase 4 optional accounts)
+- [ADDED] `TableTemplates` table for saving/loading table configurations
+- [ADDED] `GameSessionPlayers` junction table for player-session relationships
+- [MODIFIED] System events use NULL PlayerId instead of special dealer player
+- [UNCHANGED] Pots remain in-memory domain model (not persisted to database)
+
+**Why:** Incorporate recommendations from database comparison analysis (`docs/database-comparison-analysis.md`). Friend's SQL Server schema provides cleaner table/session separation, better supports table reuse and historical tracking. Azure SQL chosen for compatibility with existing SQL Server Database Project and tooling familiarity.
+
+---
 
 ### January 3, 2026 (Update 2)
 
