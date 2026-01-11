@@ -250,13 +250,15 @@ The table host (creator) has administrative privileges to configure all gameplay
 ### 5.1 User Management
 
 #### 5.1.1 Guest Access (No Registration Required)
-**REQ-UM-001:** Users shall be able to join tables as guests without creating an account  
-**REQ-UM-002:** Guest users shall provide display name when joining table  
-**REQ-UM-003:** System shall validate display name uniqueness within each table  
-**REQ-UM-004:** Display names shall be between 2-20 characters  
-**REQ-UM-005:** System shall assign temporary session ID to guest users  
-**REQ-UM-006:** Guest sessions shall persist until browser closes or user leaves table  
-**REQ-UM-007:** System shall allow same user to rejoin with same display name if disconnected (within 5 minutes)  
+**REQ-UM-001:** Users shall be able to join tables as guests without creating an account
+**REQ-UM-002:** Guest users shall provide display name when joining table
+**REQ-UM-003:** System shall validate display name uniqueness within each table
+**REQ-UM-004:** Display names shall be between 2-20 characters
+**REQ-UM-005:** System shall use Firebase Anonymous Authentication to assign persistent anonymous identity
+**REQ-UM-005a:** Anonymous identity shall persist in browser IndexedDB across browser sessions
+**REQ-UM-005b:** Anonymous identity can be upgraded to full account (Google/email) in future phases
+**REQ-UM-006:** Guest sessions shall persist until browser closes or user leaves table
+**REQ-UM-007:** System shall allow same user to rejoin with same identity if disconnected (within 5 minutes)  
 
 #### 5.1.2 Optional Account System (Future Enhancement)
 **REQ-UM-008:** System may offer optional account creation for stat tracking (Phase 4+)  

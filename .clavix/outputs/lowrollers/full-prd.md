@@ -168,6 +168,19 @@ Development is structured in 4 phases. Each phase builds on the previous.
 - **Approach:** Self-hosted WebRTC SFU using LiveKit
 - **Rationale:** P2P struggles at 10 participants; Twilio/Daily.co incur per-minute costs unsuitable for monthly 4-hour sessions
 
+#### Authentication
+- **Approach:** Firebase Anonymous Authentication
+- **Rationale:** Industry-standard anonymous identity without registration; handles token refresh, persists in IndexedDB, supports upgrade to real accounts (Phase 4+)
+- **Flow:**
+  1. User visits site → Firebase SDK creates anonymous UID (stored in browser IndexedDB)
+  2. User creates/joins table → Angular sends Firebase ID token to API
+  3. API validates token with Firebase Admin SDK, maps UID to `Players.FirebaseUid`
+- **Benefits:**
+  - No custom token implementation
+  - Automatic token refresh
+  - Can upgrade anonymous to Google/email account without losing history
+  - Free tier covers anonymous auth
+
 #### Database
 - **Primary:** Azure SQL Database for game state and hand history
 - **Schema Management:** SQL Server Database Projects (.sqlproj) for version-controlled schema
@@ -175,7 +188,7 @@ Development is structured in 4 phases. Each phase builds on the previous.
 - **Data Architecture:** Adopts Table/Session separation pattern:
   - `GameTables` - Reusable table templates with JSON configuration
   - `GameSessions` - Active game instances linked to tables
-  - `Players` - Global player registry (supports guest access with optional email)
+  - `Players` - Global player registry with `FirebaseUid` for identity
   - `GameSessionPlayers` - Links players to sessions with seat positions
   - `TableTemplates` - Saved table configurations for quick setup
   - `SessionHandEvents` - Event sourcing with NULL PlayerId for system events

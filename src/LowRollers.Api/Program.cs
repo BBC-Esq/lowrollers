@@ -11,6 +11,9 @@ using LowRollers.Api.Features.GameEngine.ActionTimer;
 using LowRollers.Api.Features.GameEngine.Broadcasting;
 using LowRollers.Api.Features.GameEngine.Connections;
 using LowRollers.Api.Features.GameEngine.Showdown;
+using LowRollers.Api.Features.TableManagement;
+using LowRollers.Api.Features.TableManagement.Invites;
+using LowRollers.Api.Features.TableManagement.Sessions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,6 +74,14 @@ builder.Services.AddSingleton<IGameStateSanitizer, GameStateSanitizer>();
 // Register game state broadcaster (SignalR adapter with per-player sanitization)
 builder.Services.AddSingleton<IGameStateBroadcaster, SignalRGameStateBroadcaster>();
 
+// Register table management services
+builder.Services.AddSingleton<IInviteCodeGenerator, InviteCodeGenerator>();
+builder.Services.AddSingleton<ISessionTokenService, SessionTokenService>();
+builder.Services.AddScoped<ITableManagementService, TableManagementService>();
+
+// Add validation for Minimal APIs (auto-validates DataAnnotations)
+builder.Services.AddValidation();
+
 // Add OpenAPI
 builder.Services.AddOpenApi();
 
@@ -102,5 +113,8 @@ app.UseCors();
 
 // Map SignalR hubs
 app.MapHub<GameHub>("/hubs/game");
+
+// Map REST API endpoints
+app.MapTableManagementEndpoints();
 
 app.Run();

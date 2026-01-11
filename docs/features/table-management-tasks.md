@@ -31,20 +31,18 @@
 
 ## API Endpoints
 
-- [ ] **Create table management API endpoints**
+- [x] **Create table management API endpoints**
   Task ID: `table-mgmt-01`
-  > **Implementation**: Create `src/LowRollers.Api/Features/TableManagement/`
+  > **Implementation**: Created `src/LowRollers.Api/Features/TableManagement/`
   > **Details**:
-  > - `CreateTableCommand.cs` + `CreateTableHandler.cs`
-  >   - Validate host display name
-  >   - Create/find player in global `Players` registry
-  >   - Create `GameTables` record with TableConfig JSON
-  >   - Create `GameSessions` record linked to table
-  >   - Generate cryptographic invite code (store hash in GameSessions)
-  >   - Create `GameSessionPlayers` record for host
-  >   - Create host session in Redis
-  >   - Return invite code and host session token
-  > - `GetTableQuery.cs` - Return table state for authorized players
+  > - Created models: `TableConfig.cs`, `CreateTableRequest.cs`, `CreateTableResponse.cs`, `TableStateResponse.cs`
+  > - Created `InviteCodeGenerator.cs` - Crypto-secure 8-char codes with SHA256 hashing
+  > - Created `SessionTokenService.cs` - HMAC-SHA256 signed tokens (temporary, replaced by Firebase Auth)
+  > - Created `TableManagementService.cs` with BCrypt password hashing (workFactor: 12)
+  > - Created `TableManagementEndpoints.cs` - Minimal API endpoints at `/api/tables`
+  > - Added `builder.Services.AddValidation()` for automatic DataAnnotation validation
+  > - Added `TableStatus` enum for compile-time safety (Lobby, Active, Paused, Closed)
+  > - TableConfig includes validation rules per HOST-TABLE-002 through HOST-TABLE-005
 
 - [ ] **Implement join table flow**
   Task ID: `table-mgmt-02`
@@ -98,19 +96,50 @@
 
 ---
 
+## Authentication
+
+- [ ] **Implement Firebase Anonymous Authentication**
+  Task ID: `table-mgmt-05a`
+  > **Implementation**: Integrate Firebase Auth for anonymous user identity
+  > **Details**:
+  > - **Firebase Setup**:
+  >   - Create Firebase project (or use existing)
+  >   - Enable Anonymous Authentication provider
+  >   - Add Firebase config to Angular environment files
+  > - **Angular Integration** (`src/LowRollers.Web/`):
+  >   - Install `@angular/fire` and `firebase` packages
+  >   - Configure Firebase in `app.config.ts`
+  >   - Create `AuthService` with `signInAnonymously()` on app init
+  >   - Store Firebase ID token, send with API requests
+  >   - Handle token refresh automatically via Firebase SDK
+  > - **API Integration** (`src/LowRollers.Api/`):
+  >   - Install `FirebaseAdmin` NuGet package
+  >   - Create `FirebaseAuthService.cs` - Initialize Firebase Admin SDK
+  >   - Create `FirebaseAuthHandler.cs` - Validate ID tokens on requests
+  >   - Update `Players` table: Add `FirebaseUid VARCHAR(128) UNIQUE`
+  >   - Update `GetOrCreatePlayerAsync()` to use FirebaseUid instead of display name
+  > - **Database Migration**:
+  >   - Add `FirebaseUid` column to `Players` table
+  >   - Create index on `FirebaseUid` for fast lookups
+  > - **Remove**:
+  >   - Remove custom `SessionTokenService` (replaced by Firebase)
+  >   - Update endpoints to use Firebase token validation
+
+---
+
 ## Guest Session Management
 
 - [ ] **Implement guest session service**
   Task ID: `table-mgmt-06`
   > **Implementation**: Create `src/LowRollers.Api/Features/Sessions/`
+  > **Depends on**: `table-mgmt-05a` (Firebase Auth)
   > **Details**:
   > - `GuestSession.cs` - Redis model (references PlayerId from global Players)
   > - `GuestSessionService.cs`
   >   - Create session in Redis with PlayerId reference
   >   - 5-minute reconnection window
-  >   - JWT token generation (SessionId, PlayerId, DisplayName, GameSessionId)
-  > - `SessionAuthenticationHandler.cs` - Validate JWT on requests
-  > - `PlayerService.cs` - Create/find players in global registry
+  >   - Use Firebase ID token for authentication (no custom JWT)
+  > - `PlayerService.cs` - Create/find players by FirebaseUid
 
 - [ ] **Implement reconnection logic**
   Task ID: `table-mgmt-07`
