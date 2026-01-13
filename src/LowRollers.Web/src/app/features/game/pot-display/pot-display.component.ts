@@ -70,7 +70,7 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
           <!-- Side Pots -->
           @for (sidePot of sidePots(); track sidePot.id; let idx = $index) {
             <div class="pot-container side-pot" [class.animating]="isAnimating()">
-              <div class="pot-chips small" aria-hidden="true">
+              <div class="pot-chips" aria-hidden="true">
                 @for (
                   stack of sidePotChipsMap().get(sidePot.id) ?? [];
                   track stack.color;
@@ -91,7 +91,7 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
                   </div>
                 }
               </div>
-              <div class="pot-info small">
+              <div class="pot-info side">
                 <div class="pot-label">
                   Side {{ idx + 1 }}
                   @if (sidePot.eligiblePlayerCount) {
@@ -120,13 +120,13 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
       }
 
       .pots-row {
         display: flex;
         align-items: flex-end;
-        gap: 16px;
+        gap: 20px;
       }
 
       .pot-container {
@@ -135,20 +135,11 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
         gap: 10px;
       }
 
-      .pot-container.side-pot {
-        transform: scale(0.8);
-        opacity: 0.9;
-      }
-
       /* ============ CHIP STACKS ============ */
       .pot-chips {
         display: flex;
         align-items: flex-end;
         gap: 3px;
-      }
-
-      .pot-chips.small {
-        gap: 2px;
       }
 
       .chip-column {
@@ -182,12 +173,6 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
         margin-bottom: 0;
       }
 
-      .pot-chips.small .chip {
-        width: 20px;
-        height: 20px;
-        margin-bottom: -12px;
-      }
-
       .pot-chips.small .chip:first-child {
         margin-bottom: 0;
       }
@@ -200,12 +185,14 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
 
       /* ============ POT INFO ============ */
       .pot-info {
-        background: var(--bg-card, rgba(0, 0, 0, 0.6));
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
+        background: linear-gradient(135deg, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.6));
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         padding: 8px 20px;
-        border-radius: var(--radius-md, 8px);
+        border-radius: 10px;
         text-align: center;
+        border: 2px solid rgba(250, 204, 21, 0.4);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       }
 
       .pot-info.small {
@@ -213,20 +200,19 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
       }
 
       .pot-label {
-        font-size: 10px;
-        font-weight: 600;
-        color: var(--text-secondary, #9ca3af);
+        font-size: 11px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.8);
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
       }
 
-      .pot-info.small .pot-label {
-        font-size: 9px;
-        letter-spacing: 0.5px;
+      .pot-info.side .pot-label {
+        color: #93c5fd;
       }
 
       .eligible-count {
-        font-size: 9px;
+        font-size: 10px;
         text-transform: none;
         letter-spacing: 0;
         opacity: 0.8;
@@ -239,30 +225,34 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
         text-shadow: 0 2px 10px rgba(234, 179, 8, 0.5);
       }
 
-      .pot-info.small .pot-amount {
-        font-size: 16px;
+      .pot-info.side .pot-amount {
+        font-size: 24px;
+        color: #60a5fa;
+        text-shadow: 0 2px 10px rgba(96, 165, 250, 0.5);
       }
 
       /* ============ TOTAL DISPLAY ============ */
       .total-display {
         display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 4px 12px;
-        background: rgba(0, 0, 0, 0.4);
-        border-radius: var(--radius-sm, 4px);
+        gap: 8px;
+        padding: 6px 16px;
+        background: rgba(0, 0, 0, 0.5);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
 
       .total-label {
-        font-size: 10px;
-        font-weight: 600;
-        color: var(--text-secondary, #9ca3af);
+        font-size: 11px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.7);
         text-transform: uppercase;
+        letter-spacing: 1px;
       }
 
       .total-amount {
-        font-size: 14px;
-        font-weight: 700;
+        font-size: 16px;
+        font-weight: 800;
         color: var(--accent-yellow, #facc15);
       }
 
@@ -277,7 +267,6 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
         }
         50% {
           transform: scale(1.1);
-          color: #fef08a;
         }
         100% {
           transform: scale(1);
