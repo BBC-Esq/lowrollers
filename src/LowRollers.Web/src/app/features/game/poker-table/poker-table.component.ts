@@ -2,6 +2,7 @@ import { Component, ChangeDetectionStrategy, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CommunityCardsComponent } from '../community-cards';
 import { PotDisplayComponent, type Pot } from '../pot-display';
+import { ChipAnimationComponent } from '../chip-animation';
 import { Card } from '../../../shared/models/card.models';
 
 /** Position identifiers for seats around the table */
@@ -63,13 +64,13 @@ const DEALER_BUTTON_POSITIONS: Record<SeatPosition, string> = {
 
 /**
  * Main poker table component displaying the oval table,
- * community cards, pot, and dealer button.
+ * community cards, pot, dealer button, and chip animations.
  * Player seats are projected via ng-content.
  */
 @Component({
   selector: 'app-poker-table',
   standalone: true,
-  imports: [CommonModule, CommunityCardsComponent, PotDisplayComponent],
+  imports: [CommonModule, CommunityCardsComponent, PotDisplayComponent, ChipAnimationComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="table-area">
@@ -105,6 +106,9 @@ const DEALER_BUTTON_POSITIONS: Record<SeatPosition, string> = {
 
         <!-- Player Seat Slots (content projected) -->
         <ng-content></ng-content>
+
+        <!-- Chip Animation Overlay -->
+        <app-chip-animation />
       </div>
     </div>
   `,
