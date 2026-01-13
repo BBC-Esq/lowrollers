@@ -79,7 +79,12 @@ const SEAT_POSITIONS: Record<SeatPosition, Record<string, string>> = {
   imports: [CommonModule, CardComponent, ActionTimerComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="player-seat" [ngStyle]="seatPositionStyle()" [class.empty-seat]="!player()">
+    <div
+      class="player-seat"
+      [attr.data-seat-position]="position()"
+      [ngStyle]="seatPositionStyle()"
+      [class.empty-seat]="!player()"
+    >
       @if (player(); as p) {
         <!-- Occupied seat -->
         <div
