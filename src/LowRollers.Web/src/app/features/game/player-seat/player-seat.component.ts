@@ -127,7 +127,7 @@ const SEAT_POSITIONS: Record<SeatPosition, Record<string, string>> = {
                     [suit]="card.suit"
                     [faceDown]="!p.holeCardsVisible"
                     [folded]="p.status === 'folded'"
-                    size="mini"
+                    size="normal"
                   />
                 }
               </div>
