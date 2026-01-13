@@ -38,38 +38,50 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (mainPot(); as pot) {
+    @if (pots().length > 0) {
       <div class="pot-display" role="region" aria-label="Pot display">
         <!-- All pots in a row -->
         <div class="pots-row">
           <!-- Main Pot -->
-          <div class="pot-container main-pot" [class.animating]="isAnimating()">
-            <div class="pot-chips" aria-hidden="true">
-              @for (stack of mainPotChips(); track stack.color; let colIdx = $index) {
-                <div
-                  class="chip-column"
-                  [style.animation-delay.ms]="colIdx * 50"
-                  [class.animate-in]="isAnimating()"
-                >
-                  @for (i of createChipArray(stack.count); track i) {
-                    <div class="chip">
-                      <svg viewBox="0 0 100 100">
-                        <use [attr.href]="getChipSymbolId(stack.color)" />
-                      </svg>
-                    </div>
-                  }
-                </div>
-              }
+          @if (mainPot(); as pot) {
+            <div
+              class="pot-container main-pot"
+              data-pot-type="main"
+              [class.animating]="isAnimating()"
+            >
+              <div class="pot-chips" aria-hidden="true">
+                @for (stack of mainPotChips(); track stack.color; let colIdx = $index) {
+                  <div
+                    class="chip-column"
+                    [style.animation-delay.ms]="colIdx * 50"
+                    [class.animate-in]="isAnimating()"
+                  >
+                    @for (i of createChipArray(stack.count); track i) {
+                      <div class="chip">
+                        <svg viewBox="0 0 100 100">
+                          <use [attr.href]="getChipSymbolId(stack.color)" />
+                        </svg>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+              <div class="pot-info">
+                <div class="pot-label">Main Pot</div>
+                <div class="pot-amount">{{ formatCurrency(pot.amount) }}</div>
+              </div>
             </div>
-            <div class="pot-info">
-              <div class="pot-label">Main Pot</div>
-              <div class="pot-amount">{{ formatCurrency(pot.amount) }}</div>
-            </div>
-          </div>
+          }
 
           <!-- Side Pots -->
           @for (sidePot of sidePots(); track sidePot.id; let idx = $index) {
-            <div class="pot-container side-pot" [class.animating]="isAnimating()">
+            <div
+              class="pot-container side-pot"
+              data-pot-type="side"
+              [attr.data-pot-index]="idx"
+              [attr.data-pot-id]="sidePot.id"
+              [class.animating]="isAnimating()"
+            >
               <div class="pot-chips" aria-hidden="true">
                 @for (
                   stack of sidePotChipsMap().get(sidePot.id) ?? [];
@@ -104,8 +116,8 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
           }
         </div>
 
-        <!-- Total (shown when side pots exist) -->
-        @if (sidePots().length > 0) {
+        <!-- Total (shown when side pots exist and a main pot is present) -->
+        @if (sidePots().length > 0 && mainPot()) {
           <div class="total-display">
             <span class="total-label">Total:</span>
             <span class="total-amount">{{ formatCurrency(totalAmount()) }}</span>
@@ -173,10 +185,6 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
         margin-bottom: 0;
       }
 
-      .pot-chips.small .chip:first-child {
-        margin-bottom: 0;
-      }
-
       .chip svg {
         width: 100%;
         height: 100%;
@@ -195,8 +203,12 @@ const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       }
 
-      .pot-info.small {
-        padding: 6px 12px;
+      .pot-info.side {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.2));
+        border: 2px solid rgba(96, 165, 250, 0.5);
+        box-shadow:
+          0 4px 12px rgba(0, 0, 0, 0.3),
+          inset 0 1px 1px rgba(255, 255, 255, 0.1);
       }
 
       .pot-label {
